@@ -1,17 +1,20 @@
 ### BMC Bioinformatics 
 ### Designs for the simultaneous inference of concentration-response curves
-### Schürmeyer, Schorning and Rahnenführer
+### Authors: Leonie Schürmeyer, Kirsten Schorning and Jörg Rahnenführer 
+### 2023
 
 # This R-Code provides the main R-Code and ideas used in the analysis of the paper
 # "Designs for the simultaneous inference of concentration-response curves". 
 # The central functions for running the code can be found in 
 # "BMCBioinformatics_SchuermeyerSchorningRahnenfuehrer_CentralFunctions.R"
 
+# Corresponding datasets or intermediate results can also be found on the GitHub page 
+# https://github.com/schuermeyer/Designs-for-the-simultaneous-inference-of-concentration-response-curves
 
 
 ####################################################################################################
 
-# load packages 
+# Load packages 
 library(DoseFinding)
 library(MASS)
 library(Metrics)
@@ -19,12 +22,9 @@ library(sfsmisc)
 
 ####################################################################################################
 
-# Preprocessing of the Data
+# Preprocessing of the data
 
-# set path
-setwd("C:/Users/schuermeyer/Documents/Projekte/CompareDesigns_GeneExpressionData/Paper/BMC Bioinformatics/AbgabeJuni")
-
-# load data
+# Load data
 load("VPA_Dataset.RData")
 load("VPADataset_matrixVersion.RData")
 
@@ -70,35 +70,35 @@ candMods.down <- Mods(sigEmax=c(450, 5.117523),
 # Because of the long runtime, results can also be found in: 
 load("PoCPvalues.VPA.RData")
 
-# overview, which genes show biologic activity (extract those with resulting pvalue < 0.01)
+# Overview, which genes show biologic activity (extract those with resulting pvalue < 0.01)
 pvalues <- as.data.frame(all.pvalues)
 pval <- 0.01
 bactiv <- which(pvalues$pvalues.down < pval | pvalues$pvalues.up < pval) # 20791 genes show biologic activity
 
-# extract gene names
+# Extract gene names
 Genenames_all <- rownames(pvalues)
 Genenames_bactiv <- Genenames_all[bactiv]
 
-# only extract genes with biologic activity
+# Only extract genes with biologic activity
 ind <- which(all_data$gene %in% Genenames_bactiv)
 bdata <- all_data[ind,]
 
 
 
 #### DO NOT RUN
-# # fit sigmoid Emax model for every gene separately
+# # Fit sigmoid Emax model for every gene separately
 # Models_sigEmax <- vector(mode="list", length = length(Genenames_bactiv))
 # 
-# # set maximal Dose
+# # Set maximal Dose
 # mD <- 1000
 # 
-# # fix boundary for sigmoid Emax to c(0.05,100) for h and c(0,1500) for EC50
+# # Fix boundary for sigmoid Emax to c(0.05,100) for h and c(0,1500) for EC50
 # for(i in 1:length(Genenames_bactiv)){
 #   Models_sigEmax[[i]] <- fitMod(dose,resp, data=bdata[bdata$gene==Genenames_bactiv[i],], 
 #                                  model="sigEmax", 
 #                                  bnds = matrix(c(0.001 * mD, 0.05, 1.5 * mD, 100), 2))
 # }
-# # extract all parameters
+# # Extract all parameters
 # Par_bactiv <- data.frame(e0=numeric(length(Genenames_bactiv)),
 #                          eMax=numeric(length(Genenames_bactiv)),
 #                          EC50=numeric(length(Genenames_bactiv)),
@@ -122,7 +122,7 @@ bdata <- all_data[ind,]
 #                                  bnds = matrix(c(0.001 * mD, 0.05, 1.5 * mD, 10), 2))
 # }
 # 
-# # extract parameters
+# # Extract parameters
 # Par_bactiv <- data.frame(e0=numeric(length(Genenames_bactiv)),
 #                          eMax=numeric(length(Genenames_bactiv)),
 #                          EC50=numeric(length(Genenames_bactiv)),
@@ -139,7 +139,7 @@ bdata <- all_data[ind,]
 # ind_ec1000 <- which(Par_bactiv$EC50>999)
 # relGene <- Genenames_bactiv[-ind_ec1000]
 # 
-# # only extract relevant parameters and models and store them
+# # Only extract relevant parameters and models and store them
 # relPar <- Par_bactiv[-ind_ec1000,]
 # ind <- which(all_data$gene %in% relGene)
 # relData <- all_data[ind,]
@@ -154,9 +154,9 @@ load("Models.RData")
 
 # Calculate locally D-optimal designs 
 
-# Calculate locally optimal designs for each gene using Particle Swarm Optimization (PSO)
-# Therefore, load own functions PSO_fixed used for locally D-optimal designs with fixed weights and
-# boundary support points and other functions like "mygrad", "eq_func" 
+# Calculate locally D-optimal designs for each gene using Particle Swarm Optimization (PSO)
+# Therefore, load own functions psoOptDesign_fixed used for locally D-optimal designs with fixed weights 
+# and boundary support points and other functions like "mygrad", "eq_func" 
 # from "BMCBioinformatics_SchuermeyerSchorningRahnenfuehrer_CentralFunctions.R"
 
 
@@ -192,7 +192,7 @@ load("optDesigns.RData")
 
 # Use Equivalence theorem to check D-optimality 
 
-# initialize sequence over design space 
+# Initialize sequence over design space 
 xseq =seq(Lb0, Ub0, length= 1001)
 
 
@@ -216,7 +216,7 @@ for(i in 1:length(optDesigns)){
 } # No values over 0.01 => all optimal, 
 # except for 85 genes, they lead to singular matrices, remove those and reduce dataset to 15233 genes
 
-#check NAs (singular info matrix)
+# Check NAs (singular info matrix)
 checkNA <- rep(0,length(optDesigns))
 for(i in 1:length(optDesigns)){
   checkNA[i] <- sum(is.na(yseqDesigns[[i]]))
@@ -234,17 +234,17 @@ Models_opt <- Models[opt_new]
 
 ####################################################################################################
 
-# Develop Kmeans design
+# Develop kmeans design
 
 # Initialize list 
 sortsup <- vector(mode="list", length=length(optDesigns))
 
-# only look at genes in opt_new which have a corresponding locally D-optimal design 
+# Only look at genes in opt_new which have a corresponding locally D-optimal design 
 for(i in opt_new){
   sortsup[[i]] <- sort(optDesigns[[i]]$supPoints)
 }
 
-# remove 1st and 4th support point (because C0={{0},{1000}})
+# Remove 1st and 4th support point (because C0={{0},{1000}})
 midsup <- vector(mode="list", length=length(sortsup))
 for(i in 1:length(sortsup)){
   midsup[[i]] <- sortsup[[i]][2:3]
@@ -254,7 +254,7 @@ midsup <- unname(midsup)
 midsuppoints <- round(midsup,digits=0)
 
 
-# more robust approach by developing kmeans design 500 times and get the mean value per support point
+# More robust approach by developing kmeans design 500 times and get the mean value per support point
 
 kmeans500 <- data.frame(T1=numeric(500),T2=numeric(500),T3=numeric(500),
                         T4=numeric(500),T5=numeric(500),
@@ -280,14 +280,14 @@ kmeansDesign500$supPoints <-  round(c(0, as.numeric(colMeans(kmeans500)[1:7]), 1
 # Develop simultaneous inference design 
 
 # First introduce a 5x5 grid over parameter space with steepness h and EC50
-# initialize dataframe for grid 
 
-# only use parameters corresponding to genes with present locally D-optimal design 
+# Initialize dataframe for grid 
+# Only use parameters corresponding to genes with present locally D-optimal design 
 
 dfarea <- data.frame(Gene=1:length(relPar_opt$h), h= relPar_opt$h, e=relPar_opt$EC50, 
                        area= numeric(length(relPar_opt$e0)))
 
-# create areas of grid classification 
+# Create areas of grid classification 
 dfarea$area[dfarea$h > 0 & dfarea$h <= 2 
                 & dfarea$e > 0 & dfarea$e <= 200] <- 1
 
@@ -363,13 +363,13 @@ dfarea$area[dfarea$h > 8 & dfarea$h <= 10
 dfarea$area[dfarea$h > 8 & dfarea$h <= 10 
                 & dfarea$e > 800 & dfarea$e <= 1000] <- 25
 
-# create table of frequencies of all genes present in each area 
+# Create table of frequencies of all genes present in each area 
 tab <- data.frame(table(dfarea$area))
 weight <- sum(tab$Freq)
 tab$weight <- tab$Freq/weight
 t(tab)
 
-# now draw a representative for each area 
+# Now draw a representative for each area 
 set.seed(197)
 Reparea <- data.frame(area=1:25, weight= tab$weight, Rep=numeric(25))
 
@@ -386,16 +386,16 @@ for(i in 1:25){
   Reparea[i,4:7] <- as.numeric(relPar_opt[Reparea$Rep[i],])
 }
 
-# only use areas which are represented higher than 5%, reduces to 7 representatives 
+# Only use areas which are represented higher than 5%, reduces to 7 representatives 
 Reparea7 <- Reparea[which(Reparea$weight>0.05),]
 weight7 <- Reparea7$weight/sum(Reparea7$weight)
 Prior7 <- Reparea7
 theta7 <- Reparea7[,4:7]
 
-# calculate locally D-optimal designs for the 7 representatives
+# Calculate locally D-optimal designs for the 7 representatives
 OD7 <- vector(mode="list", length=length(Prior7$E0))
 for(i in 1:length(Prior7$E0)){
-  # fix representative parameter values for each area 
+  # Fix representative parameter values for each area 
   mytheta= as.numeric(theta7[i,])
   
   # Use PSO to calculate each locally D-optimal design 
@@ -407,7 +407,7 @@ for(i in 1:length(Prior7$E0)){
   OD7[[i]] <- opt_des
 }
 
-# calculate D-optimality criterion value
+# Calculate D-optimality criterion value
 Dcrit7 <- numeric(7)
 for(i in 1:7){
   Dcrit7[i] <- Dcrit(w=rep(1/4, 4), x= as.numeric(OD7[[i]]$supPoints),
@@ -415,31 +415,31 @@ for(i in 1:7){
 }
 
 
-# calculate simultaneous inference design with PSO 
-# use following criterion only considering the 7 representatives 
+# Calculate simultaneous inference design with PSO 
+# Use following criterion only considering the 7 representatives 
 
 
-# set reciprocal condition number to e^-20 
+# Set reciprocal condition number to e^-20 
 critnumber <- 0.00000000000000000001
 
-# only calculate simultaneous inference design with 7 representative genes and corresponding weights 
+# Only calculate simultaneous inference design with 7 representative genes and corresponding weights 
 # for the 7 areas
 
-Bayes_Crit7 <- function(w,x,gradient, pillarweight, thetapillar, Dcrit7, ...){
-  # initialize criterion value 
-  Bayes_Crit <- 0
+Sim_Crit7 <- function(w,x,gradient, pillarweight, thetapillar, Dcrit7, ...){
+  # Initialize criterion value 
+  Sim_Crit <- 0
   for(i in 1:7){
-    # use condition number to avoid singular matrices 
+    # Use condition number to avoid singular matrices 
     rcond_var <- sapply(1:7, FUN = function(i){rcond(info(w,x,gradient, 
                                                           theta=as.numeric(thetapillar[i,])))})
     if(min(rcond_var > critnumber )){
       current <- pillarweight[i]*((det(info(w,x,gradient, 
                                             theta=as.numeric(thetapillar[i,]), ...)))^(1/4)/ Dcrit7[i])
-      Bayes_Crit <- Bayes_Crit+current
+      Sim_Crit <- Sim_Crit+current
     }
-    else(Bayes_Crit <- -Inf)
+    else(Sim_Crit <- -Inf)
   }
-  return(Bayes_Crit)
+  return(Sim_Crit)
 }
 
 
@@ -448,7 +448,7 @@ Bayes_Crit7 <- function(w,x,gradient, pillarweight, thetapillar, Dcrit7, ...){
 # Ub0 = 1000
 # 
 # starttime <- Sys.time()
-# simDesign = psoOptDesign(crit=Bayes_Crit7, control = list(numIt = 2000, numPart = 3000, 
+# simDesign = psoOptDesign(crit=Sim_Crit7, control = list(numIt = 2000, numPart = 3000, 
 #                                                                setProgressBar= TRUE),
 #                               nPoints=9, Lb= Lb0, Ub =Ub0, gradient= mygrad,
 #                               thetapillar=theta7, Dcrit7=Dcrit7,
@@ -466,7 +466,7 @@ simultaneousDesign$supPoints <- c(0.0,145.286,279.822,345.414,456.865,575.21 ,65
 
 
 
-# calculate simultaneous efficiency for each area
+# Calculate simultaneous efficiency for each area
 simultaneouseff7 <- sapply(1:7, 
                         FUN = function(i){(det(info(w=simultaneousDesign$weights,
                                                     x=simultaneousDesign$supPoints,
@@ -474,13 +474,13 @@ simultaneouseff7 <- sapply(1:7,
                                                     theta=as.numeric(theta7[i,]))))^(1/4)/ Dcrit7[i]})
 sum(simultaneouseff7 * weight7)# efficiency of 0.833
 
-# calculate criterion value for every x in design space [0,1000]
+# Calculate criterion value for every x in design space [0,1000]
 xseq =seq(Lb0, Ub0, length= 1001)
-yseq = vapply(xseq, FUN= aeq_funcsimultaneous7, FUN.VALUE=1, design=simultaneousDesign,
+yseq = vapply(xseq, FUN= eq_funcsimultaneous7, FUN.VALUE=1, design=simultaneousDesign,
               gradient=mygrad, pillarweight=weight7, 
               simultaneouseff = simultaneouseff7,thetapillar = theta7)
 
-# plot the equivalence theorem to see if the design is simultaneous optimal 
+# Plot the equivalence theorem to see if the design is simultaneous D-optimal 
 plot(xseq, yseq, type ="l", main="",
      ylab=expression(s(x,xi[Theta[7]],pi)), xlab="concentration")
 abline(h= 0, col="grey") #simultaneous D-optimal 
@@ -488,16 +488,16 @@ abline(h= 0, col="grey") #simultaneous D-optimal
 
 ####################################################################################################
 
-# original design 
+# Original design 
 origDesign <- kmeansDesign500
 origDesign$weights <- c(2/9,rep(1/9,7))
 origDesign$supPoints <- c(0,25,150,350,450,550,800,1000)
 
-# equidistant design 
+# Equidistant design 
 equiDesign <- kmeansDesign500
 equiDesign$supPoints <- c(0,125,250,375,500,625,750,875,1000)
 
-# log equidistant design 
+# Log-equidistant design 
 logequiDesign <- kmeansDesign500
 logequiDesign$supPoints <- round(c(0, lseq(from=1, to=1000, length=8)))
 
@@ -507,7 +507,7 @@ logequiDesign$supPoints <- round(c(0, lseq(from=1, to=1000, length=8)))
 
 ### D-efficiency comparison 
 
-# calculate D-criterion value of locally optimal designs for every gene
+# Calculate D-criterion value of locally optimal designs for every gene
 Dcrit_all <- rep(NA, length(optDesigns))
 for(i in opt_new){
   Dcrit_all[i] <- Dcrit(w=rep(1/4, 4), x= as.numeric(optDesigns[[i]]$supPoints), 
@@ -515,9 +515,9 @@ for(i in opt_new){
 }
 
 
-# now for every gene with the different designs 
+# Now for every gene with the different designs 
 
-# simultaneous design  
+# Simultaneous design  
 Dcrit_all_simultaneous <- rep(NA, length(optDesigns))
 for(i in opt_new){
   Dcrit_all_simultaneous[i] <- Dcrit(w=as.numeric(simultaneousDesign$weights), 
@@ -527,7 +527,7 @@ for(i in opt_new){
 which(is.na(Dcrit_all_simultaneous))#NA of genes with singular matrix like before 
 
 
-# kmeans design with equal weights
+# Kmeans design 
 Dcrit_all_kmeans <- rep(NA, length(optDesigns))
 for(i in opt_new){
   Dcrit_all_kmeans[i] <- Dcrit(w=as.numeric(kmeansDesign500$weights), 
@@ -537,7 +537,7 @@ for(i in opt_new){
 which(is.na(Dcrit_all_kmeans)) %in% which(is.na(Dcrit_all_simultaneous))#same as before
 
 
-# original design
+# Original design
 Dcrit_all_orig <- rep(NA, length(optDesigns))
 for(i in opt_new){
   Dcrit_all_orig[i] <- Dcrit(w=as.numeric(origDesign$weights), x= as.numeric(origDesign$supPoints), 
@@ -546,7 +546,7 @@ for(i in opt_new){
 which(is.na(Dcrit_all_orig)) %in% which(is.na(Dcrit_all_simultaneous))#same as before
 
 
-# equidistant design
+# Equidistant design
 Dcrit_all_equi <- rep(NA, length(optDesigns))
 for(i in opt_new){
   Dcrit_all_equi[i] <- Dcrit(w=as.numeric(equiDesign$weights), x= as.numeric(equiDesign$supPoints), 
@@ -554,7 +554,7 @@ for(i in opt_new){
 }
 which(is.na(Dcrit_all_equi)) %in% which(is.na(Dcrit_all_simultaneous))#same as before 
 
-# logequidistant design
+# Log-equidistant design
 Dcrit_all_logequi <- rep(NA, length(optDesigns))
 for(i in opt_new){
   Dcrit_all_logequi[i] <- Dcrit(w=as.numeric(logequiDesign$weights), 
@@ -562,7 +562,7 @@ for(i in opt_new){
                                 gradient= mygrad, theta= as.numeric(relPar[i,]))
 }
 which(is.na(Dcrit_all_logequi)) %in% which(is.na(Dcrit_all_simultaneous))
-# nearly overall same NAs (except logequidistant design)
+# Nearly overall same NAs (except logequidistant design)
 
 simultaneous_DEff <- Dcrit_all_simultaneous/Dcrit_all
 kmeans_DEff <- Dcrit_all_kmeans/Dcrit_all
@@ -572,7 +572,7 @@ logequi_DEff <- Dcrit_all_logequi/Dcrit_all
 
 length(which(is.na(simultaneous_DEff)))#85 for all except logequi
 
-# remove the genes which lead to singular matrices 85 and store all calculated efficiency values in 
+# Remove the genes which lead to singular matrices 85 and store all calculated efficiency values in 
 # D_eff 
 remove <- which(is.na(simultaneous_DEff))
 D_Eff <- data.frame(Defficiency= c(rep("Simultaneous", length(optDesigns)-length(remove)),
@@ -591,16 +591,16 @@ D_Eff <- data.frame(Defficiency= c(rep("Simultaneous", length(optDesigns)-length
 ####################################################################################################
 
 # Simulation study 
-# load parameters  
+# Load parameters  
 load("relPar.RData")
 load("Models.RData")
 
 
 # Setup simulation parameters for all designs 
-simnum <- 500 # number of simulation steps
-space <- 1:1000 # design space
-new <- data.frame(dose = space, iwas=factor(1)) # initialize sequence for prediction of new curves 
-n_opt <- c(18,27,36,45,63,90) # observation numbers 
+simnum <- 500 # Number of simulation steps
+space <- 1:1000 # Design space
+new <- data.frame(dose = space, iwas=factor(1)) # Initialize sequence for prediction of new curves 
+n_opt <- c(18,27,36,45,63,90) # Observation numbers 
 
 # Run simulation study for all genes with a locally D-optimal design 
 ind <- opt_new
@@ -622,7 +622,7 @@ for(i in ind){
 mD <- 1000
 
 
-# set seed
+# Set seed
 set.seed(167)
 
 
@@ -654,47 +654,47 @@ for(i in 1:length(results)){
 # Calculate runtime 
 starttime <- Sys.time()
 
-# start simulation with and vary genes in i 
+# Start simulation and vary genes in i 
 for(i in ind){
-  # fix model 
+  # Fix model 
   mod <- Models[[i]]
   
-  # extract original model course (outsourced because of runtime)
+  # Extract original model course (outsourced because of runtime)
   origin <- Origin[[i]]
   
-  # use model specific sigma  
+  # Use model specific sigma  
   sigma2 <- sigma[i]
   
-  # extract support points 
+  # Extract support points 
   supp <- as.numeric(sort(optDesigns[[i]]$supPoints))
   
-  # simulation for each observation number varied with j 
+  # Simulation for each observation number varied with j 
   for(j in 1:6){
-    # use rounding procedure of Pukelsheim to fix numbers of observations at each step
+    # Use rounding procedure of Pukelsheim to fix numbers of observations at each step
     reps <- rndDesign(weights, n_opt[j])
     doses <- rep(supp, reps)
     
     newdat <- data.frame(dose = doses, iwas=factor(1))
     truePred <- predict(mod, newdata=newdat, predType = "full-model", se.fit = FALSE)
     
-    # simulation steps varied in i 
+    # Simulation steps varied in i 
     for(z in 1:simnum){
-      # generate normal errors with corresponding sigma 
+      # Generate normal errors with corresponding sigma 
       error <- rnorm(length(doses),0,sigma2)
       simdata <- truePred+error
       simdat <- data.frame(dose=doses, resp=simdata)
       
-      # fit model with simulated data points 
+      # Fit model with simulated data points 
       simmod <- fitMod(dose,resp, data=simdat, 
                        model="sigEmax", 
                        bnds = matrix(c(0.001 * mD, 0.05, 1.5 * mD, 10), 2))
       
-      # calculate EC50 
+      # Calculate EC50 
       results[[i]][[j]]$EC50[z] <- unname(simmod$coefs[3])
       
-      # calculate RMSE 
+      # Calculate RMSE 
       newPred <- predict(simmod, newdata=new, predType = "full-model", se.fit = FALSE)
-      # standardize with corresponding range (EMax parameter) of each gene to get NRMSE
+      # Standardize with corresponding range (EMax parameter) of each gene to get NRMSE
       results[[i]][[j]]$NRMSE[z] <- rmse(origin, newPred)/as.numeric(abs(mod$coefs[2]))
     }
   }
@@ -707,9 +707,9 @@ opt <- results[ind]
 
 #######
 
-# do the same for the other designs 
+# Do the same for the other designs 
 
-# simultaneous D-optimal design: 
+# Simultaneous D-optimal design: 
 
 # Initialize variable to save results 
 results <- vector(mode="list", length = length(relPar))
@@ -750,56 +750,56 @@ for(i in 1:length(reps)){
 # Calculate runtime 
 starttime <- Sys.time()
 
-# start simulation with and vary genes in i (only look at genes in ind)
+# Start simulation and vary genes in i (only look at genes in ind)
 
 for(i in ind){
-  # fix model 
+  # Fix model 
   mod <- Models[[i]]
   
-  # extract original model course (outsourced because of runtime)
+  # Extract original model course (outsourced because of runtime)
   origin <- Origin[[i]]
   
-  # use model specific sigma  
+  # Use model specific sigma  
   sigma2 <- sigma[i]
   
-  # vary number of measurements  
+  # Vary number of measurements  
   for(j in 1:6){
     
     doses <- ODsimultaneous[[j]]
     newdat <- data.frame(dose = doses, iwas=factor(1))
     truePred <- predict(mod, newdata=newdat, predType = "full-model", se.fit = FALSE)
     
-    # simulation steps varied in i 
+    # Simulation steps varied in i 
     for(z in 1:simnum){
-      # generate normal errors with corresponding sigma 
+      # Generate normal errors with corresponding sigma 
       error <- rnorm(length(doses),0,sigma2)
       simdata <- truePred+error
       simdat <- data.frame(dose=doses, resp=simdata)
       
-      # fit model with simulated data points 
+      # Fit model with simulated data points 
       simmod <- fitMod(dose,resp, data=simdat, 
                        model="sigEmax", 
                        bnds = matrix(c(0.001 * mD, 0.05, 1.5 * mD, 10), 2))
       
-      # calculate EC50 
+      # Calculate EC50 
       results[[i]][[j]]$EC50[z] <- unname(simmod$coefs[3])
       
-      # calculate RMSE 
+      # Calculate RMSE 
       newPred <- predict(simmod, newdata=new, predType = "full-model", se.fit = FALSE)
-      # standardize with corresponding range (EMax parameter) of each gene to get NRMSE
+      # Standardize with corresponding range (EMax parameter) of each gene to get NRMSE
       results[[i]][[j]]$NRMSE[z] <- rmse(origin, newPred)/as.numeric(abs(mod$coefs[2]))
     }
   }
 }
 endtime <- Sys.time()
-time_simultaneous <- endtime-starttime # runs approx. 2 days 
+time_simultaneous <- endtime-starttime # Runs approx. 2 days 
 
 simultaneous <- results[ind]
 
 
 ###
 
-# logequidistant 
+# Log-equidistant 
 
 # Initialize variable to save results 
 results <- vector(mode="list", length = length(relPar))
@@ -816,7 +816,7 @@ for(i in 1:length(results)){
   results[[i]] <- g_OD
 }
 
-# first initialize logeuqidistant designs with different repetitions of measurements 
+# First initialize logequidistant designs with different repetitions of measurements 
 ODlogequi <- vector(mode="list",length=6)
 reps <- c(2,3,4,5,7,10)
 
@@ -824,55 +824,55 @@ for(i in 1:6){
   ODlogequi[[i]] <- rep(logequiDesign$supPoints,each=reps[i])
 }
 
-# set seed again
+# Set seed again
 set.seed(167)
 
 # Calculate runtime 
 starttime <- Sys.time()
 
-# start simulation with and vary genes in i (only look at genes in ind)
+# Start simulation and vary genes in i (only look at genes in ind)
 
 for(i in ind){
-  # fix model 
+  # Fix model 
   mod <- Models[[i]]
   
-  # extract original model course (outsourced because of runtime)
+  # Extract original model course (outsourced because of runtime)
   origin <- Origin[[i]]
   
-  # use model specific sigma  
+  # Use model specific sigma  
   sigma2 <- sigma[i]
   
-  # vary number of measurements  
+  # Vary number of measurements  
   for(j in 1:6){
     
     doses <- ODlogequi[[j]]
     newdat <- data.frame(dose = doses, iwas=factor(1))
     truePred <- predict(mod, newdata=newdat, predType = "full-model", se.fit = FALSE)
     
-    # simulation steps varied in i 
+    # Simulation steps varied in i 
     for(z in 1:simnum){
-      # generate normal errors with corresponding sigma 
+      # Generate normal errors with corresponding sigma 
       error <- rnorm(length(doses),0,sigma2)
       simdata <- truePred+error
       simdat <- data.frame(dose=doses, resp=simdata)
       
-      # fit model with simulated data points 
+      # Fit model with simulated data points 
       simmod <- fitMod(dose,resp, data=simdat, 
                        model="sigEmax", 
                        bnds = matrix(c(0.001 * mD, 0.05, 1.5 * mD, 10), 2))
       
-      # calculate EC50 
+      # Calculate EC50 
       results[[i]][[j]]$EC50[z] <- unname(simmod$coefs[3])
       
-      # calculate RMSE 
+      # Calculate RMSE 
       newPred <- predict(simmod, newdata=new, predType = "full-model", se.fit = FALSE)
-      # standardize with corresponding range (EMax parameter) of each gene to get NRMSE
+      # Standardize with corresponding range (EMax parameter) of each gene to get NRMSE
       results[[i]][[j]]$NRMSE[z] <- rmse(origin, newPred)/as.numeric(abs(mod$coefs[2]))
     }
   }
 }
 endtime <- Sys.time()
-time_logequi <- endtime-starttime # runs approx. 2 days 
+time_logequi <- endtime-starttime # Runs approx. 2 days 
 
 logequi <- results[ind]
 
@@ -880,7 +880,7 @@ logequi <- results[ind]
 
 ######
 
-# equidistant design 
+# Equidistant design 
 
 # Initialize variable to save results 
 results <- vector(mode="list", length = length(relPar))
@@ -897,7 +897,7 @@ for(i in 1:length(results)){
   results[[i]] <- g_OD
 }
 
-# first initialize equidistant designs with different repetitions of measurements 
+# First initialize equidistant designs with different repetitions of measurements 
 ODequi <- vector(mode="list",length=6)
 reps <- c(2,3,4,5,7,10)
 
@@ -905,49 +905,49 @@ for(i in 1:6){
   ODequi[[i]] <- rep(equiDesign$supPoints,each=reps[i])
 }
 
-# set seed again
+# Set seed again
 set.seed(167)
 
 # Calculate runtime 
 starttime <- Sys.time()
 
-# start simulation with and vary genes in i (only look at genes in ind)
+# Start simulation and vary genes in i (only look at genes in ind)
 
 for(i in ind){
-  # fix model 
+  # Fix model 
   mod <- Models[[i]]
   
-  # extract original model course (outsourced because of runtime)
+  # Extract original model course (outsourced because of runtime)
   origin <- Origin[[i]]
   
-  # use model specific sigma  
+  # Use model specific sigma  
   sigma2 <- sigma[i]
   
-  # vary number of measurements  
+  # Vary number of measurements  
   for(j in 1:6){
     
     doses <- ODequi[[j]]
     newdat <- data.frame(dose = doses, iwas=factor(1))
     truePred <- predict(mod, newdata=newdat, predType = "full-model", se.fit = FALSE)
     
-    # simulation steps varied in i 
+    # Simulation steps varied in i 
     for(z in 1:simnum){
-      # generate normal errors with corresponding sigma 
+      # Generate normal errors with corresponding sigma 
       error <- rnorm(length(doses),0,sigma2)
       simdata <- truePred+error
       simdat <- data.frame(dose=doses, resp=simdata)
       
-      # fit model with simulated data points 
+      # Fit model with simulated data points 
       simmod <- fitMod(dose,resp, data=simdat, 
                        model="sigEmax", 
                        bnds = matrix(c(0.001 * mD, 0.05, 1.5 * mD, 10), 2))
       
-      # calculate EC50 
+      # Calculate EC50 
       results[[i]][[j]]$EC50[z] <- unname(simmod$coefs[3])
       
-      # calculate RMSE 
+      # Calculate RMSE 
       newPred <- predict(simmod, newdata=new, predType = "full-model", se.fit = FALSE)
-      # standardize with corresponding range (EMax parameter) of each gene to get NRMSE
+      # Standardize with corresponding range (EMax parameter) of each gene to get NRMSE
       results[[i]][[j]]$NRMSE[z] <- rmse(origin, newPred)/as.numeric(abs(mod$coefs[2]))
     }
   }
@@ -960,7 +960,7 @@ equi <- results[ind]
 
 ######
 
-# original design 
+# Original design 
 
 # Initialize variable to save results 
 results <- vector(mode="list", length = length(relPar))
@@ -978,64 +978,64 @@ for(i in 1:length(results)){
   results[[i]] <- g_OD
 }
 
-# first initialize originaldistant designs with different repetitions of measurements 
+# First initialize original designs with different repetitions of measurements 
 ODoriginal <- vector(mode="list",length=6)
 reps <- c(2,3,4,5,7,10)
 
-# initialize original designs with different numbers of measurements 
+# Initialize original designs with different numbers of measurements 
 for(i in 1:6){
   ODoriginal[[i]] <- rep(c(0,origDesign$supPoints),each=reps[i])
 }
 
-# set seed again
+# Set seed again
 set.seed(167)
 
 # Calculate runtime 
 starttime <- Sys.time()
 
-# start simulation with and vary genes in i (only look at genes in ind)
+# Start simulation and vary genes in i (only look at genes in ind)
 
 for(i in ind){
-  # fix model 
+  # Fix model 
   mod <- Models[[i]]
   
-  # extract original model course (outsourced because of runtime)
+  # Extract original model course (outsourced because of runtime)
   origin <- Origin[[i]]
   
-  # use model specific sigma  
+  # Use model specific sigma  
   sigma2 <- sigma[i]
   
-  # vary number of measurements  
+  # Vary number of measurements  
   for(j in 1:6){
     
     doses <- ODoriginal[[j]]
     newdat <- data.frame(dose = doses, iwas=factor(1))
     truePred <- predict(mod, newdata=newdat, predType = "full-model", se.fit = FALSE)
     
-    # simulation steps varied in i 
+    # Simulation steps varied in i 
     for(z in 1:simnum){
-      # generate normal errors with corresponding sigma 
+      # Generate normal errors with corresponding sigma 
       error <- rnorm(length(doses),0,sigma2)
       simdata <- truePred+error
       simdat <- data.frame(dose=doses, resp=simdata)
       
-      # fit model with simulated data points 
+      # Fit model with simulated data points 
       simmod <- fitMod(dose,resp, data=simdat, 
                        model="sigEmax", 
                        bnds = matrix(c(0.001 * mD, 0.05, 1.5 * mD, 10), 2))
       
-      # calculate EC50 
+      # Calculate EC50 
       results[[i]][[j]]$EC50[z] <- unname(simmod$coefs[3])
       
-      # calculate RMSE 
+      # Calculate RMSE 
       newPred <- predict(simmod, newdata=new, predType = "full-model", se.fit = FALSE)
-      # standardize with corresponding range (EMax parameter) of each gene to get NRMSE
+      # Standardize with corresponding range (EMax parameter) of each gene to get NRMSE
       results[[i]][[j]]$NRMSE[z] <- rmse(origin, newPred)/as.numeric(abs(mod$coefs[2]))
     }
   }
 }
 endtime <- Sys.time()
-time_original <- endtime-starttime # runs approx. 2 days 
+time_original <- endtime-starttime # Runs approx. 2 days 
 
 original <- results[ind]
 

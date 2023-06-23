@@ -1,7 +1,9 @@
-# First the central functions are introduced: 
+# The central functions corresponding to the R-Code for 
+# "BMCBioinformatics_SchuermeyerSchorningRahnenfuehrer.R"
+# are introduced here: 
 
 
-# Fisherinformation matrix depending on w,x, and theta
+# Fisherinformation matrix depending on weights w, support points x, and parameter theta
 info <- function(w,x,gradient,...){
   dimTheta<-length(gradient(1,...))
   tmp<-matrix(0,dimTheta,dimTheta)
@@ -12,11 +14,32 @@ info <- function(w,x,gradient,...){
 }
 
 # D-optimality criterion
-Dcrit<-function(w,x,gradient,...){
+Dcrit <- function(w,x,gradient,...){
   return((det(info(w,x,gradient,...)))^(1/4))
 }
 
+# Criterion for simultaneous D-optimal design 
+# Set reciprocal condition number to e^-20 
+critnumber <- 0.00000000000000000001
+Sim_Crit7 <- function(w,x,gradient, pillarweight, thetapillar, Dcrit7, ...){
+  # Initialize criterion value 
+  Sim_Crit <- 0
+  for(i in 1:7){
+    # Use condition number to avoid singular matrices 
+    rcond_var <- sapply(1:7, FUN = function(i){rcond(info(w,x,gradient, 
+                                                          theta=as.numeric(thetapillar[i,])))})
+    if(min(rcond_var > critnumber )){
+      current <- pillarweight[i]*((det(info(w,x,gradient, 
+                                            theta=as.numeric(thetapillar[i,]), ...)))^(1/4)/ Dcrit7[i])
+      Sim_Crit <- Sim_Crit+current
+    }
+    else(Sim_Crit <- -Inf)
+  }
+  return(Sim_Crit)
+}
+
 # Gradient of sigmoid Emax from DoseFinding package
+library(DoseFinding)
 mygrad = function(x, theta)
 {
   result = t(sigEmaxGrad(dose=x, 
@@ -24,12 +47,22 @@ mygrad = function(x, theta)
   return(result)
 }
 
+# Equivalence function for locally D-optimal designs
+eq_func = function(x, design, gradient, ...)
+{
+  infomat = info(w=design$weights,x=design$supPoints,gradient=gradient,...)
+  inv_info = solve(infomat)
+  model_length =length(gradient(x, ...))
+  result = t(gradient(x, ...)) %*% inv_info %*% gradient(x, ...)-model_length
+  return(result)
+}
 
-aeq_funcsimultaneous7 = function(x, design, gradient, pillarweight, 
+# Equivalence function for simultaneous D-optimal design
+eq_funcsimultaneous7 = function(x, design, gradient, pillarweight, 
                           simultaneouseff, thetapillar, ...){
-  # initialize cirterion value
+  # Initialize cirterion value
   mysum <- 0
-  # calculate equivalence sentence for simultaneous D-optimality (first right site of the equation)
+  # Calculate equivalence sentence for simultaneous D-optimality (first right site of the equation)
   p <- 4
   right <- p*(sum(pillarweight*simultaneouseff)) 
   
@@ -44,8 +77,10 @@ aeq_funcsimultaneous7 = function(x, design, gradient, pillarweight,
 }
 
 
-
-psoOptDesign <- function(crit,control=list(),nPoints=3,Lb=0,Ub=150,xFixed=NULL,wFixed=NULL,xold=NULL,nold=rep(0,length(xold)),n2=rep(0,length(old)),...){
+# Particle Swarm Optimization 
+psoOptDesign <- function(crit,control=list(),nPoints=3,Lb=0,Ub=150,
+                         xFixed=NULL,wFixed=NULL,xold=NULL,
+                         nold=rep(0,length(xold)),n2=rep(0,length(old)),...){
   ###############################################################################
   
   con <- list(numIt = 30, numPart = 300, beta=0.5,gamma=0.7,setRsol=FALSE,setProgressBar=FALSE,OutCritValue=TRUE,intmRes=FALSE)
@@ -73,8 +108,7 @@ psoOptDesign <- function(crit,control=list(),nPoints=3,Lb=0,Ub=150,xFixed=NULL,w
   
   
   
-  #Initializing particles
-  
+  # Initializing particles
   
   arg<-matrix(0,nPoints*2,n);
   
@@ -98,7 +132,7 @@ psoOptDesign <- function(crit,control=list(),nPoints=3,Lb=0,Ub=150,xFixed=NULL,w
   zn<-1:n
   
   #==================================================================
-  #This is where the actual alogorithm begins
+  # This is where the actual alogorithm begins
   if(con$setProgressBar) pb<-txtProgressBar(min=0,max=timesteps,style=3)
   for(i in 1:timesteps){
     
@@ -126,8 +160,8 @@ psoOptDesign <- function(crit,control=list(),nPoints=3,Lb=0,Ub=150,xFixed=NULL,w
     zo<-min(zn)
     best[i,]<-c(wo,xo)
     
-    #Move the particles
-    #the weights...
+    # Move the particles
+    # the weights...
     if(is.null(wFixed)){
       for(l in 1:n){
         arg[1:nPoints,l]<-arg[1:nPoints,l]*(1-betas)+wo*betas+alphas*rnorm(nPoints,0,0.25)
@@ -140,7 +174,7 @@ psoOptDesign <- function(crit,control=list(),nPoints=3,Lb=0,Ub=150,xFixed=NULL,w
       }
     }
     
-    #Make sure that the particles are still in the search room after having moved
+    # Make sure that the particles are still in the search room after having moved
     if(is.null(wFixed))arg[1:nPoints,]<-pmax(arg[1:nPoints,],.1)
     if(is.null(xFixed))arg[(nPoints+1):(2*nPoints),]<-pmax(arg[(nPoints+1):(2*nPoints),],Blow)
     if(is.null(wFixed))arg[1:nPoints,]<-pmin(arg[1:nPoints,],1)
@@ -182,7 +216,8 @@ psoOptDesign <- function(crit,control=list(),nPoints=3,Lb=0,Ub=150,xFixed=NULL,w
 
 
 
-
+# Particle Swarm Optimization Version with fixed weights and specification of fixed boundary 
+# support points
 psoOptDesign_fixed <-function(crit,control=list(), nPoints=3, Lb=0, Ub= 150, xFixed=NULL,
                        wFixed=NULL, xold=NULL, nold=rep(0,length(xold)),
                        n2=rep(0,length(old)), boundarySup=FALSE, startSup=NULL, 
@@ -256,7 +291,7 @@ psoOptDesign_fixed <-function(crit,control=list(), nPoints=3, Lb=0, Ub= 150, xFi
   zn <- 1:n
   
   #==================================================================
-  #This is where the actual alogorithm begins
+  # This is where the actual alogorithm begins
   if(con$setProgressBar) pb <- txtProgressBar(min=0, max=timesteps, style=3)
   for(i in 1:timesteps){
     
@@ -284,8 +319,8 @@ psoOptDesign_fixed <-function(crit,control=list(), nPoints=3, Lb=0, Ub= 150, xFi
     zo <- min(zn)
     best[i,] <- c(wo,xo)
     
-    #Move the particles
-    #the weights...
+    # Move the particles
+    # the weights...
     if(is.null(wFixed)){
       for(l in 1:n){
         arg[1:nPoints,l] <- arg[1:nPoints,l]*(1-betas)+wo*betas+alphas*rnorm(nPoints,0,0.25)
@@ -306,7 +341,7 @@ psoOptDesign_fixed <-function(crit,control=list(), nPoints=3, Lb=0, Ub= 150, xFi
       }
     }
     
-    #Make sure that the particles are still in the search room after having moved
+    # Make sure that the particles are still in the search room after having moved
     if(is.null(wFixed))arg[1:nPoints,] <- pmax(arg[1:nPoints,],.1)
     if(is.null(xFixed))arg[(nPoints+1):(2*nPoints),] <- pmax(arg[(nPoints+1):(2*nPoints),],Blow)
     if(is.null(wFixed))arg[1:nPoints,] <- pmin(arg[1:nPoints,],1)
