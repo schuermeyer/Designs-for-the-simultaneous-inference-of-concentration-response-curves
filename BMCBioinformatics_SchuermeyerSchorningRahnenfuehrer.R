@@ -195,20 +195,16 @@ load("optDesigns.RData")
 # Initialize sequence over design space 
 xseq =seq(Lb0, Ub0, length= 1001)
 
+# Attention long runtime:
+yseqDesigns <- vector(mode="list", length=length(optDesigns))
+for(i in 1:length(optDesigns)){
+  yseq1 <- try(vapply(xseq, FUN= eq_func, FUN.VALUE=1, design=optDesigns[[i]],
+                     gradient=mygrad,  theta=as.numeric(relPar[i,])), silent=TRUE)
 
-#### DO NOT RUN:
-# yseqDesigns <- vector(mode="list", length=length(optDesigns))
-# for(i in 1:length(optDesigns)){
-#   yseq1 <- try(vapply(xseq, FUN= eq_func, FUN.VALUE=1, design=optDesigns[[i]], 
-#                      gradient=mygrad,  theta=as.numeric(relPar[i,])), silent=TRUE)
-#   
-#   if(inherits(yseq1, "try-error")) { yseqDesigns[[i]] <- NA }
-#   
-#   else { yseqDesigns[[i]] <- yseq1 }
-# }
+  if(inherits(yseq1, "try-error")) { yseqDesigns[[i]] <- NA }
 
-# Because of long runtime also stored and loadable in 
-load("yseqDesigns.RData")
+  else { yseqDesigns[[i]] <- yseq1 }
+}
 
 EquValue <- rep(NA,length(optDesigns))
 for(i in 1:length(optDesigns)){
